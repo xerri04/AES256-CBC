@@ -47,8 +47,8 @@ int main(void)
 
     uint8_t i;
     char MESSAGE[CHUNK_SIZE];                               
-    char key[32];
-    char nonce[16];
+    char key[48];
+    char nonce[32];
 
     fseek(fp_in, 0, SEEK_END);
     int mlen = ftell(fp_in);
@@ -121,9 +121,19 @@ int main(void)
     int valid3 = pkcs7_padding_valid( nexarray, nlen, sizeof(nexarray), 16 );
     printf("Is the pkcs7 padding valid message = %d  |  key = %d  |  nonce = %d\n", valid, valid2, valid3);
 
+    AES_ctx_set_iv(&ctx, (const uint8_t *)nexarray);
+
+    // Start the encryption
+    AES_init_ctx_iv(&ctx, (const uint8_t *)kexarray, (const uint8_t *)nexarray);
+
+    // Encrypt
+    AES_CBC_encrypt_buffer(&ctx, (uint8_t *)hexarray, mlenu);
+    fwrite(hexarray, 1, mlenu, fp_out);
+    
+    /*
     size_t bytes_read;
 
-    while ((bytes_read = fread(hexarray, 1, CHUNK_SIZE, fp_in)))
+    while ((bytes_read = fread(MESSAGE, 1, CHUNK_SIZE, fp_in)))
     {
         // Start the encryption
         AES_init_ctx_iv(&ctx, (const uint8_t *)kexarray, (const uint8_t *)nexarray);
@@ -132,6 +142,7 @@ int main(void)
         AES_CBC_encrypt_buffer(&ctx, (uint8_t *)hexarray, mlenu);
         fwrite(hexarray, 1, mlenu, fp_out);
     }
+    */
 
     fclose(fp_in);
     fclose(fp_out);
