@@ -113,13 +113,25 @@ int main(void)
     int messagePad = pkcs7_padding_pad_buffer( hexarray, mlen, sizeof(hexarray), 16 );
     int keyPad = pkcs7_padding_pad_buffer( kexarray, klen, sizeof(kexarray), 16 );
     int noncePad = pkcs7_padding_pad_buffer( nexarray, nlen, sizeof(nexarray), 16 );
-    
+        
     // In case you want to check if the padding is valid
     int valid = pkcs7_padding_valid( hexarray, mlen, sizeof(hexarray), 16 );
     int valid2 = pkcs7_padding_valid( kexarray, klen, sizeof(kexarray), 16 );
     int valid3 = pkcs7_padding_valid( nexarray, nlen, sizeof(nexarray), 16 );
     printf("Is the pkcs7 padding valid message = %d  |  key = %d  |  nonce = %d\n", valid, valid2, valid3);
+    
+    size_t bytes_read;
+    bytes_read = fread(decryptedtext, 1, mlen, hacklab_in);
 
+    // Start the decryption
+    AES_ctx_set_iv(&ctx, (const uint8_t *)nexarray);
+    AES_init_ctx_iv(&ctx, (const uint8_t *)kexarray, (const uint8_t *)nexarray);
+
+    // Decrypt
+    AES_CBC_decrypt_buffer(&ctx, decryptedtext, mlenu);
+    fwrite(decryptedtext, 1, bytes_read, fp_decrypt);
+
+    /*
     size_t bytes_read;
 
     while ((bytes_read = fread(decryptedtext, 1, CHUNK_SIZE, hacklab_in)))
@@ -128,9 +140,10 @@ int main(void)
         AES_init_ctx_iv(&ctx, (const uint8_t *)kexarray, (const uint8_t *)nexarray);
 
         // Decrypt
-        AES_CBC_decrypt_buffer(&ctx, (uint8_t *)hexarray, mlenu);
-        fwrite(hexarray, 1, mlenu, fp_decrypt);
+        AES_CBC_decrypt_buffer(&ctx, decryptedtext, bytes_read);
+        fwrite(decryptedtext, 1, bytes_read, fp_decrypt);
     }
+    */
 
     fclose(hacklab_in);
     fclose(fp_decrypt);
