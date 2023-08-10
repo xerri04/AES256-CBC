@@ -45,30 +45,52 @@ int main(void)
         return 1; // Return 1 instead of 0 on error
     }
 
-    char key[32];
-    char nonce[16]; 
-    uint8_t decryptedtext[CHUNK_SIZE];
-    uint8_t i;                               
+    uint8_t i;
+    char decryptedtext[CHUNK_SIZE];                               
+    char key[48];
+    char nonce[32];
 
-    size_t klen = fread(key, 1, sizeof(key), PMK_Key);
-    fread(nonce, sizeof(uint8_t), sizeof(nonce), hacklab_in);
+    fseek(hacklab_in, 0, SEEK_END);
+    int mlen = ftell(hacklab_in);
+    fseek(hacklab_in, 0, SEEK_SET);
 
+    fread(nonce, sizeof(char), 16, hacklab_in);
+    int nlen = strlen(nonce);
+
+    fread(key, 1, 32, PMK_Key);
+    int klen = strlen(key);
+    
     printf("key:\n");
-    phex((const uint8_t *)key);
+    phex(key);
     printf("\n");
 
     printf("nonce:\n");
-    phex((const uint8_t *)nonce);
+    phex(nonce);
     printf("\n");
 
-    // Proper length of key and nonce
-    int klenu = 32;
-    int nlenu = 16;
+    // Proper length of message, key and nonce
+    int mlenu = mlen;
+    if (mlen % 16) {
+        mlenu += 16 - (mlen % 16);
+        printf("The original length of the STRING = %d and the length of the padded STRING = %d\n", mlen, mlenu);
+    }
+
+    int klenu = klen;
+    if (klen % 16) {
+        klenu += 16 - (klen % 16);
+        printf("The original length of the KEY = %d and the length of the padded KEY = %d\n", klen, klenu);
+    }
+
+    int nlenu = nlen;
+    if (nlen % 16) {
+        nlenu += 16 - (nlen % 16);
+        printf("The original length of the NONCE = %d and the length of the padded NONCE = %d\n", nlen, nlenu);
+    }
 
     // Make the uint8_t arrays
-    uint8_t hexarray[CHUNK_SIZE];
-    uint8_t kexarray[32];
-    uint8_t nexarray[16];
+    uint8_t hexarray[mlenu];
+    uint8_t kexarray[klenu];
+    uint8_t nexarray[nlenu];
     
     // Initialize them with zeros
     memset( hexarray, 0, sizeof(hexarray) );
@@ -76,26 +98,38 @@ int main(void)
     memset( nexarray, 0, sizeof(nexarray) );
     
     // Fill the uint8_t arrays
-    for (size_t i = 0; i < CHUNK_SIZE; i++) {
-        hexarray[i] = decryptedtext[i];
+    for (int i = 0; i < mlen; i++) {
+        hexarray[i] = (uint8_t)decryptedtext[i];
     }
 
-    for (size_t i = 0; i < klen; i++) {
+    for (int i = 0; i < klen; i++) {
         kexarray[i] = (uint8_t)key[i];
     }
     
-    for (size_t i = 0; i < sizeof(nonce); i++) {
+    for (int i = 0; i < nlen; i++) {
         nexarray[i] = (uint8_t)nonce[i];
     }
 
-    size_t decryptedtext_len;
+    int messagePad = pkcs7_padding_pad_buffer( hexarray, mlen, sizeof(hexarray), 16 );
+    int keyPad = pkcs7_padding_pad_buffer( kexarray, klen, sizeof(kexarray), 16 );
+    int noncePad = pkcs7_padding_pad_buffer( nexarray, nlen, sizeof(nexarray), 16 );
+    
+    // In case you want to check if the padding is valid
+    int valid = pkcs7_padding_valid( hexarray, mlen, sizeof(hexarray), 16 );
+    int valid2 = pkcs7_padding_valid( kexarray, klen, sizeof(kexarray), 16 );
+    int valid3 = pkcs7_padding_valid( nexarray, nlen, sizeof(nexarray), 16 );
+    printf("Is the pkcs7 padding valid message = %d  |  key = %d  |  nonce = %d\n", valid, valid2, valid3);
 
-    // Continue processing the file in CHUNK_SIZE blocks
-    while ((decryptedtext_len = fread(decryptedtext, 1, CHUNK_SIZE, hacklab_in)))
+    size_t bytes_read;
+
+    while ((bytes_read = fread(decryptedtext, 1, CHUNK_SIZE, hacklab_in)))
     {
-        AES_init_ctx_iv(&ctx, kexarray, nexarray);
-        AES_CBC_decrypt_buffer(&ctx, decryptedtext, decryptedtext_len);
-        fwrite(decryptedtext, 1, decryptedtext_len, fp_decrypt);
+        // Start the decryption
+        AES_init_ctx_iv(&ctx, (const uint8_t *)kexarray, (const uint8_t *)nexarray);
+
+        // Decrypt
+        AES_CBC_decrypt_buffer(&ctx, (uint8_t *)hexarray, mlenu);
+        fwrite(hexarray, 1, mlenu, fp_decrypt);
     }
 
     fclose(hacklab_in);
