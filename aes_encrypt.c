@@ -4,8 +4,10 @@
 #include <string.h>
 
 #include "aes.h"
+#include "pkcs7_padding.c"
 
 #define CBC 1
+#define AES_BLOCK_SIZE 16
 #define CHUNK_SIZE 1024
 
 static void phex(const uint8_t *str);
@@ -41,22 +43,21 @@ int main(void)
     if (PMK_Key == NULL)
     {
         printf("Error opening PMK key\n");
-        return 1; // Return 1 instead of 0 on error
+        return 1;
     }
 
-    // Reading key
-    uint8_t key[32]; // Properly allocate the key buffer
-    fread(key, 1, sizeof(key), PMK_Key); // Use key instead of uninitialized variable
+    uint8_t i;
+    char MESSAGE[CHUNK_SIZE];                               
+    uint8_t key[32];
+    uint8_t nonce[16];
 
-    // Write the nonce to the output file.
-    uint8_t nonce[16]; // Properly allocate the nonce buffer
+    size_t bytes_read;
+
     randombytes_buf(nonce, sizeof(nonce));
-    fwrite(nonce, sizeof(uint8_t), sizeof(nonce), fp_out); // Use sizeof(uint8_t) for consistency
+    fwrite(nonce, sizeof(char), sizeof(nonce), fp_out);
 
-    uint8_t MESSAGE[CHUNK_SIZE];
-
-    AES_init_ctx_iv(&ctx, key, nonce);
-
+    fread(key, 1, sizeof(key), PMK_Key);
+    
     printf("key:\n");
     phex(key);
     printf("\n");
@@ -65,13 +66,43 @@ int main(void)
     phex(nonce);
     printf("\n");
 
-    size_t bytes_read;
-
     while ((bytes_read = fread(MESSAGE, 1, CHUNK_SIZE, fp_in)))
     {
+        int mlen = bytes_read;
+        int mlenu = mlen;
+
+        if (mlen % 16) {
+            mlenu += 16 - (mlen % 16);
+            printf("The original length of the STRING = %d and the length of the padded STRING = %d\n", mlen, mlenu);
+        }
+
+        // Make the uint8_t arrays
+        uint8_t hexarray[mlenu];
+        
+        // Initialize them with zeros
+        memset(hexarray, 0, sizeof(hexarray));
+        
+        // Fill the uint8_t arrays
+        for (int i = 0; i < mlen; i++) {
+            hexarray[i] = (uint8_t)MESSAGE[i];
+        }
+
+        int messagePad = pkcs7_padding_pad_buffer(hexarray, mlen, sizeof(hexarray), 16);
+        
+        // In case you want to check if the padding is valid
+        int valid = pkcs7_padding_valid(hexarray, mlen, sizeof(hexarray), 16);
+        
+        if (valid > 0) {
+            printf("Is the pkcs7 padding valid message = %d\n", valid);
+        }
+
+        // Start the encryption
         AES_init_ctx_iv(&ctx, key, nonce);
-        AES_CBC_encrypt_buffer(&ctx, MESSAGE, bytes_read);
-        fwrite(MESSAGE, 1, bytes_read, fp_out);
+
+        // Encrypt
+        AES_CBC_encrypt_buffer(&ctx, (uint8_t *)hexarray, mlenu);
+        
+        fwrite(hexarray, 1, mlenu, fp_out);
     }
 
     fclose(fp_in);
