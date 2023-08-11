@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
+
 #include "aes.h"
 #include "pkcs7_padding.c"
 
@@ -62,12 +64,12 @@ int main(void)
 
     printf("nonce:\n");
     phex(nonce);
-    printf("\n");
 
     while ((bytes_read = fread(decryptedtext, 1, CHUNK_SIZE, hacklab_in)))
     {
         int mlen = bytes_read;
         int mlenu = mlen;
+
         if (mlen % 16) {
             mlenu += 16 - (mlen % 16);
             printf("The original length of the STRING = %d and the length of the padded STRING = %d\n", mlen, mlenu);
@@ -77,28 +79,29 @@ int main(void)
         uint8_t hexarray[mlenu];
         
         // Initialize them with zeros
-        memset( hexarray, 0, sizeof(hexarray) );
+        memset(hexarray, 0, sizeof(hexarray));
         
         // Fill the uint8_t arrays
         for (int i = 0; i < mlen; i++) {
             hexarray[i] = (uint8_t)decryptedtext[i];
         }
 
-        int messagePad = pkcs7_padding_pad_buffer(hexarray, mlen, sizeof(hexarray), 16);
-        
-        // In case you want to check if the padding is valid
-        int valid = pkcs7_padding_valid(hexarray, mlen, sizeof(hexarray), 16);
-        
-        if (valid > 0) {
-            printf("Is the pkcs7 padding valid message = %d\n", valid);
-        }
-
         // Start the decryption
         AES_init_ctx_iv(&ctx, key, nonce);
 
         // Decrypt
-        AES_CBC_decrypt_buffer(&ctx, decryptedtext, bytes_read);
-        fwrite(decryptedtext, 1, mlenu, fp_decrypt);
+        AES_CBC_decrypt_buffer(&ctx, hexarray, mlenu);
+
+        // Determine the padding length
+        int padlen = pkcs7_padding_data_length(hexarray, mlenu, 16);
+
+        if (padlen < CHUNK_SIZE) {
+            mlenu = padlen;
+            printf("%d\n", padlen);
+        }
+       
+        // Write the decrypted data without padding
+        fwrite(hexarray, 1, mlenu, fp_decrypt);
     }
 
     fclose(hacklab_in);
