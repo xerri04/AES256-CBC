@@ -70,6 +70,7 @@ int main(void)
     {
         int mlen = bytes_read;
         int mlenu = mlen;
+
         if (mlen % 16) {
             mlenu += 16 - (mlen % 16);
             printf("The original length of the STRING = %d and the length of the padded STRING = %d\n", mlen, mlenu);
@@ -79,7 +80,7 @@ int main(void)
         uint8_t hexarray[mlenu];
         
         // Initialize them with zeros
-        memset( hexarray, 0, sizeof(hexarray) );
+        memset(hexarray, 0, sizeof(hexarray));
         
         // Fill the uint8_t arrays
         for (int i = 0; i < mlen; i++) {
