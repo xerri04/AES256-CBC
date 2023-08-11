@@ -94,7 +94,6 @@ int main(void)
 
         // Determine the padding length
         int padlen = pkcs7_padding_data_length(hexarray, mlenu, 16);
-        printf("The actual data length (without the padding) = %d\n", padlen);
 
         if (CHUNK_SIZE > padlen && padlen > 0) {
             mlenu = padlen;
