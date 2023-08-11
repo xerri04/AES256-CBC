@@ -97,7 +97,6 @@ int main(void)
 
         if (padlen < CHUNK_SIZE) {
             mlenu = padlen;
-            printf("%d\n", padlen);
         }
        
         // Write the decrypted data without padding
