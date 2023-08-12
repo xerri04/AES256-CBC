@@ -9,10 +9,11 @@
 #include <unistd.h>
 
 #include "aes.h"
+#include "pkcs7_padding.h"
 #include "pkcs7_padding.c"
 
 #define CBC 1
-#define CHUNK_SIZE 1024
+#define CHUNK_SIZE 4096
 
 #define cpucycles(cycles) cycles = __rdtsc()
 
