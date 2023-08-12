@@ -8,7 +8,7 @@ DSOURCES = lib/aes.c lib/decrypt.c
 EOUTPUT = lib/encrypt
 DOUTPUT = lib/decrypt
 
-.PHONY: all clean
+.PHONY: all speed shared clean
 
 all: $(EOUTPUT) $(DOUTPUT)
 
@@ -19,8 +19,17 @@ $(EOUTPUT): $(ESOURCES)
 $(DOUTPUT): $(DSOURCES)
 	$(CC) -o $@ $(DSOURCES) -lsodium
 
+# Create a static library named libmylib.a
+aes.a: $(ESOURCES) $(DSOURCES)
+	ar rcs $@ $(ESOURCES) $(DSOURCES)
+
+# Add the aes.a library to the dependencies for the encrypt and decrypt executables
+$(EOUTPUT): aes.a
+$(DOUTPUT): aes.a
+
 clean:
 	-$(RM) -rf $(EOUTPUT)
 	-$(RM) -rf $(DOUTPUT)
 	-$(RM) -rf lib/decrypted.key
 	-$(RM) -rf lib/public.key.hacklab
+	-$(RM) -rf aes.a
