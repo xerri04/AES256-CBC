@@ -8,13 +8,12 @@
 #include <x86intrin.h>
 #include <unistd.h>
 
-#include <unistd.h>
-
 #include "aes.h"
+#include "pkcs7_padding.h"
 #include "pkcs7_padding.c"
 
 #define CBC 1
-#define CHUNK_SIZE 1024
+#define CHUNK_SIZE 4096
 
 #define cpucycles(cycles) cycles = __rdtsc()
 
@@ -65,7 +64,7 @@ int main(int argc, char *argv[])
         hacklab_in = fopen("public.key.hacklab", "rb");
 
         // Open the decrypt file.
-        fp_decrypt = fopen("public.key", "wb");
+        fp_decrypt = fopen("decrypted.key", "wb");
     }
 
     else if (strcmp(argv[1], "nbit") == 0){
@@ -177,7 +176,7 @@ int main(int argc, char *argv[])
 
         double time_spent = (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec) / 1000000000.0;
 
-        if(padlen == CHUNK_SIZE){
+        if(bytes_read == CHUNK_SIZE){
             uint64_t current = cpucycles_result();
 
             fprintf(cpu_cycle_file, "%ld  %f\n", current, time_spent);
