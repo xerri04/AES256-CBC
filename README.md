@@ -28,6 +28,6 @@ To include this implementation as a library
 
 ## Test
 This implentation includes codes which test the following speed and time:
-1. CPU Cycles per bytes
+1. CPU Cycles per Bytes
 2. CPU Time
 3. Wall Time
