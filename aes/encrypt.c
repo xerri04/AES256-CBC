@@ -8,9 +8,9 @@
 #include <x86intrin.h>
 #include <unistd.h>
 
-#include "/lib/aes.h"
-#include "/lib/pkcs7_padding.h"
-#include "/lib/pkcs7_padding.c"
+#include "./lib/aes.h"
+#include "./lib/pkcs7_padding.h"
+#include "./lib/pkcs7_padding.c"
 
 #define CBC 1
 #define CHUNK_SIZE 4096
