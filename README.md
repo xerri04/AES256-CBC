@@ -20,12 +20,6 @@ To clean the files, run the Makefile:
 make clean
 ```
 
-## Library
-To include this implementation as a library
-```
-#include aes.a
-```
-
 ## Test
 This implentation includes codes which test the following speed and time:
 1. CPU Cycles per Bytes
