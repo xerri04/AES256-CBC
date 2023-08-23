@@ -27,116 +27,77 @@ do {                                                   \
 
 #define cpucycles_result() cpucycles_sum
 
+size_t rlen_total;
+double total_cpucycles;
+struct timespec begin_cpu, end_cpu, begin_wall, end_wall;
 unsigned long long cpucycles_before, cpucycles_after, cpucycles_sum;
 
 static void phex(const uint8_t *str);
 
-long get_mem_usage()
+// prints string as hex
+static void phex(const uint8_t *str) // Use const for read-only access
 {
-  struct rusage myusage;
+    uint8_t len = 16;
 
-  getrusage(RUSAGE_SELF, &myusage);
-  return myusage.ru_maxrss;
+    for (unsigned char i = 0; i < len; ++i)
+        printf("%.2x", str[i]);
+    printf("\n");
 }
 
-int main(int argc, char *argv[])
-{
-    if (sodium_init() < 0)
-    {
-        printf("panic! the library couldn't be initialized; it is not safe to use");
-        return 1;
-    }
 
+static int decrypt(const char *target_file, const char *source_file, const char *pmk_keyfile) {
     struct AES_ctx ctx;
-
-    FILE *hacklab_in, *fp_decrypt, *PMK_Key;
-
-    if (strcmp(argv[1], "secret") == 0) {
-        // Open the secret key hacklab file.
-        hacklab_in = fopen("secret.key.hacklab", "rb");
-
-        // Open the decrypt file.
-        fp_decrypt = fopen("secret.key", "wb");
-    }
-
-    else if (strcmp(argv[1], "pub") == 0) {
-        // Open the public key hacklab file.
-        hacklab_in = fopen("public.key.hacklab", "rb");
-
-        // Open the decrypt file.
-        fp_decrypt = fopen("decrypted.key", "wb");
-    }
-
-    else if (strcmp(argv[1], "nbit") == 0){
-        // Open the input file.
-        hacklab_in = fopen("nbit.key.hacklab", "rb");
-
-        // Open the output file.
-        fp_decrypt = fopen("nbit.key", "wb");
-    }
-
-    else {
-            printf("\n%s is not a valid argument\n", argv[1]);
-            return 0;
-    }
-
-    if (hacklab_in == NULL)
-    {
-        printf("Error opening key to encrypt.\n");
-        return 1;
-    }
-
-    if (fp_decrypt == NULL)
-    {
-        printf("Error opening file for ciphertext.\n");
-        return 1;
-    }
-
-    // Open the PMK key.
-    PMK_Key = fopen("PMK.key", "rb");
-    if (PMK_Key == NULL)
-    {
-        printf("Error opening PMK key\n");
-        return 1; // Return 1 instead of 0 on error
-    }
 
     uint8_t i;
     char decryptedtext[CHUNK_SIZE];                               
     uint8_t key[32];
     uint8_t nonce[16];
 
-    size_t bytes_read;
+    unsigned long long out_len;
+    size_t  rlen;
 
-    fread(nonce, sizeof(char), sizeof(nonce), hacklab_in);
-    fread(key, 1, sizeof(key), PMK_Key);
+    FILE *pmk_key = fopen(pmk_keyfile, "rb");
+    if (pmk_key == NULL) {
+        printf("\nPMK Key with the file name [%s] cannot be found!\n", pmk_keyfile);
+        return 1;
+    }
+
+    FILE *fp_s = fopen(source_file, "rb");
+    if (fp_s == NULL) {
+        printf("\nSource file to be dencrypted with the file name [%s] cannot be found!\n", source_file);
+        return 1;
+    }
+
+    FILE *fp_t = fopen(target_file, "wb");
+    if (fp_t == NULL) {
+        printf("\nTarget file with the file name [%s] cannot be created!\n", target_file);
+        return 1;
+    }
+
+    fread(nonce, sizeof(char), sizeof(nonce), fp_s);
+    fread(key, 1, sizeof(key), pmk_key);
     
-    printf("key:\n");
+    printf("\nkey: ");
     phex(key);
-    printf("\n");
 
-    printf("nonce:\n");
+    printf("nonce: ");
     phex(nonce);
 
-    printf("\n[*] Attempting to decrypt public key\n");
+    printf("\n[*] Attempting to decrypt [%s]\n", source_file);
 
-    long baseline = get_mem_usage();
+    clock_gettime(CLOCK_REALTIME, &begin_wall);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &begin_cpu);
 
-    unsigned int counter;
-    unsigned long long min=-1, max=0, total_bytes=0, total_cpu_cycle=0;
-    double total_time;
-    
-    FILE *cpu_cycle_file = fopen("cpu_cycle_decrypt.txt", "w");
-    struct timespec begin, end;
+    int padlen;
 
-    while ((bytes_read = fread(decryptedtext, 1, CHUNK_SIZE, hacklab_in)))
-    {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &begin);
+    size_t bytes_read;
+    while ((bytes_read = fread(decryptedtext, 1, CHUNK_SIZE, fp_s))) {
+        
+        int mlen = bytes_read;
+        int mlenu = mlen;
 
         cpucycles_reset();
         cpucycles_start();
-
-        int mlen = bytes_read;
-        int mlenu = mlen;
 
         if (mlen % 16) {
             mlenu += 16 - (mlen % 16);
@@ -161,67 +122,84 @@ int main(int argc, char *argv[])
         AES_CBC_decrypt_buffer(&ctx, hexarray, mlenu);
 
         // Determine the padding length
-        int padlen = pkcs7_padding_data_length(hexarray, mlenu, 16);
+        padlen = pkcs7_padding_data_length(hexarray, mlenu, 16);
 
-        if (CHUNK_SIZE > padlen && padlen > 0) {
+        /*
+        for (i=0; i<padlen; i++){   
+            printf("%02x",hexarray[i]);
+  
+        }
+        */
+
+        if (padlen != 0) {
             mlenu = padlen;
         }
 
+        /*
+        if (CHUNK_SIZE > padlen && padlen > 0) {
+            mlenu = padlen;
+        }
+        */
+
         cpucycles_stop();
 
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end);
-
         // Write the decrypted data without padding
-        fwrite(hexarray, 1, mlenu, fp_decrypt);
+        fwrite(hexarray, 1, mlenu, fp_t);
 
-        double time_spent = (end.tv_sec - begin.tv_sec) + (end.tv_nsec - begin.tv_nsec) / 1000000000.0;
-
-        if(bytes_read == CHUNK_SIZE){
-            uint64_t current = cpucycles_result();
-
-            fprintf(cpu_cycle_file, "%ld  %f\n", current, time_spent);
-
-            total_cpu_cycle += current;
-            if(current > max){
-                max = current;
-            }
-            if(current < min){
-                min = current;
-            }
-        } 
-        
-        total_time += time_spent; 
-        counter ++;
+        total_cpucycles += cpucycles_result();
+        rlen_total += bytes_read;
     }
 
-    long memory_usage = get_mem_usage() - baseline;
+    /*
+    printf("\npadlen: %d\n", padlen);
 
-    printf("\n[+] Public key hacklab decrypted\n");
-    
-    total_bytes = counter * CHUNK_SIZE;
+    fseek(fp_s, 0, SEEK_END);
+    long current_size = ftell(fp_s);
+    fseek(fp_s, 0, SEEK_SET);
 
-    printf("\nChunksize is: %i\n", CHUNK_SIZE);
-    printf("Minimum CPU cycles per bytes: %.3f\n", (float)min/CHUNK_SIZE);
-    printf("Maximum CPU cycles per bytes: %.3f\n", (float)max/CHUNK_SIZE);
-    printf("Average CPU cycles per bytes: %.3f\n", (float)total_cpu_cycle/total_bytes);
+    int new_size = current_size - (current_size - ((CHUNK_SIZE * (current_size / CHUNK_SIZE)) + padlen));
 
-    printf("\nTotal CPU time: %f seconds\n", total_time);
-    printf("Total CPU Cycles/Bytes per second: %.3f \n", (float)total_cpu_cycle/total_bytes/total_time);
+    printf("\nnew size: %d\n", new_size);
 
-    fclose(hacklab_in);
-    fclose(fp_decrypt);
-    fclose(PMK_Key);
-    fclose(cpu_cycle_file);
+    fseek(fp_t, 0, SEEK_END);
 
+    ftruncate(fileno(fp_t), new_size);
+    */
+
+    clock_gettime(CLOCK_REALTIME, &end_wall);
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_cpu);
+
+    fclose(fp_t);
+    fclose(fp_s);
+    fclose(pmk_key);
     return 0;
 }
 
-// prints string as hex
-static void phex(const uint8_t *str) // Use const for read-only access
-{
-    uint8_t len = 16;
+int main(int argc, char *argv[]) {
 
-    for (unsigned char i = 0; i < len; ++i)
-        printf("%.2x", str[i]);
-    printf("\n");
+    if (argc != 4) {
+        printf("Usage: %s <ENCRYPTED_FILENAME> <PLAINTEXT_FILENAME> <KEY>\n", argv[0]);
+        return 1;
+    }
+
+    char *ENCRYPTED_HACKLAB = argv[1];
+    char *KEY_NAME = argv[2];
+    char *PMK_KEY = argv[3];
+
+    if (decrypt(KEY_NAME, ENCRYPTED_HACKLAB, PMK_KEY) != 0) {
+        return 1;
+    }
+    
+    printf("\n[+] [%s] decrypted to [%s] successfully\n", ENCRYPTED_HACKLAB, KEY_NAME);
+
+    double total_time_cpu = (end_cpu.tv_sec - begin_cpu.tv_sec) + (end_cpu.tv_nsec - begin_cpu.tv_nsec) / 1000000000.0;
+    double total_time_wall = (end_wall.tv_sec - begin_wall.tv_sec) + (end_wall.tv_nsec - begin_wall.tv_nsec) / 1000000000.0;
+
+    printf("\nWALL time: %f seconds\n", total_time_wall);
+    printf("CPU time: %f seconds\n", total_time_cpu);
+
+    printf("\nTotal CPU Cycles: %.0f\n", total_cpucycles);
+    printf("CPU Cycles/Bytes: %f\n", total_cpucycles / rlen_total);
+
+    return 0;
 }
