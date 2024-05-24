@@ -1,13 +1,13 @@
 # AES256-CBC
-AES256-CBC C with padding implementation with tiny AES, which generates a random nonce that is safe to use for cryptography padding implementation
+An implementation of AES-256-CBC with padding using Tiny AES, which generates a random nonce that is safe to use for cryptography.
 
-The current repository contains codes which measures:
+This repository contains code that measures:
 
 1. CPU Cycles per Bytes
 2. CPU Time
 3. Wall Time
 
-To compile both encrypt.c & decrypt.c, simply run the Makefile:
+To compile both encrypt.c and decrypt.c, simply run the Makefile:
 
 ```
 make all
