@@ -19,7 +19,7 @@ Simply clean by running:
 make clean
 ```
 
-# Usage
+## Usage
 
 Usage of encrypt.c:
 
