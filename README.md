@@ -1,4 +1,4 @@
-# AES256-CBC
+## AES256-CBC
 An implementation of AES-256-CBC with padding using Tiny AES, which generates a random nonce that is safe to use for cryptography.
 
 This repository contains code that measures:
@@ -19,7 +19,7 @@ Simply clean by running:
 make clean
 ```
 
-## Usage
+### Usage
 
 Usage of encrypt.c:
 
